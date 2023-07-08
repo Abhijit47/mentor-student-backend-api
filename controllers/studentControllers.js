@@ -122,7 +122,13 @@ const addMentor = async (req, res, next) => {
 
 };
 
-export default { createStudent, getAllStudents, getUnassignedStudents, getassignedStudents, addMentor };
+export default {
+  createStudent,
+  getAllStudents,
+  getUnassignedStudents,
+  getassignedStudents,
+  addMentor
+};
 
 /**
  * try {

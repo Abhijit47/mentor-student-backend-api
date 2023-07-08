@@ -103,5 +103,98 @@ const updateMentor = async (req, res, next) => {
 
 };
 
+const assignMentor = async (req, res, next) => {
+  try {
+    // 1. Getting data from req.body
+    const data = req.body;
 
-export default { createMentor, getMentor, getAllMentors, updateMentor };
+    // 2. update the mentor field with body data
+    const result = await client
+      .db('trainer-student')
+      .collection('mentor')
+      .updateOne(
+        { "mentor_name": data.mentor_name },
+        {
+          $set: { "student_assigned": data.student_assigned }
+        }
+      );
+
+    // 3. Update student collection parallely
+    data.student_assigned.map(async (student) => {
+      await client
+        .db("trainer-student")
+        .collection("student")
+        .updateOne(
+          { "student_name": student },
+          {
+            $set: { "mentor_name": data.mentor_name, "mentor_assigned": true }
+          }
+        );
+    });
+
+    // 4. send a response to a user
+    result.acknowledged
+      ? successResponse(res, "Mentor assigned successfully.", 200)
+      : errorResponse(res, "Something went wrong", 400);
+
+  } catch (err) {
+    errorResponse(res, err.message, 400);
+    next();
+  }
+};
+
+const changeMentor = async (req, res, next) => {
+  // remove the student from prev. mentor
+  try {
+    // 1. Getting data from body
+    const data = req.body;
+
+    // 2. remove the student from the student_assigned array of the mentor
+    const removeStudent = await client
+      .db('trainer-student')
+      .collection('mentor')
+      .updateOne(
+        { "mentor_name": data.prev_mentor },
+        {
+          $pull: { "student_assigned": data.student_name }
+        }
+      );
+
+    // 2. update mentor name of student collection
+    const removeMentor = await client
+      .db('trainer-student')
+      .collection('student')
+      .updateOne(
+        { "student_name": data.student_name },
+        { $set: { "mentor_name": data.new_mentor } }
+      );
+
+    // 3. add the student to new mentor in mentor collection
+    const addNewMentor = await client
+      .db('trainer-student')
+      .collection('mentor')
+      .updateOne(
+        { "mentor_name": data.new_mentor },
+        {
+          $push: { "student_assigned": data.student_name }
+        }
+      );
+
+    // send back a response
+    removeStudent.acknowledged && removeMentor.acknowledged && addNewMentor.acknowledged
+      ? successResponse(res, `Student Leave the mentor`, 200, data.prev_mentor)
+      : errorResponse(res, "Something went wrong in mentor leaving", 400);
+  } catch (err) {
+    errorResponse(res, err, 400);
+  }
+  // res.status(200).json({ message: "im from change mentor controller." });
+};
+
+export default {
+  createMentor,
+  getMentor,
+  getAllMentors,
+  updateMentor,
+  assignMentor,
+  changeMentor
+};
